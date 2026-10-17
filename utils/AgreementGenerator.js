@@ -34,7 +34,7 @@ async function createAgreementPDF(application) {
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     // Signature font files
-    const fontsDirectory = path.join(__dirname, "../assets/fonts");
+    const fontsDirectory = path.join(__dirname, "../fonts");
 
     const signatureFonts = {
       "signature-1": "signature-1.ttf",
