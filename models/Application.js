@@ -191,13 +191,7 @@ const applicationSchema = new mongoose.Schema(
 
     agreementStatus: {
       type: String,
-      enum: [
-        "Pending",
-        "Generated",
-        "Sent",
-        "Signed",
-        "Completed",
-      ],
+      enum: ["Pending", "Generated", "Sent", "Signed", "Completed"],
       default: "Pending",
     },
 
@@ -219,6 +213,12 @@ const applicationSchema = new mongoose.Schema(
         type: String,
         default: "",
         trim: true,
+      },
+      /* Customer ne kaunsa signature style select kiya */
+      signatureFont: {
+        type: String,
+        enum: ["signature-1", "signature-2", "signature-3"],
+        default: "signature-1",
       },
 
       /* E-sign signature data */

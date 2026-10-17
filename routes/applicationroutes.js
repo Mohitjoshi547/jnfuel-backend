@@ -540,7 +540,7 @@ router.get("/:id/agreement", requireCustomer, async (req, res) => {
 
 router.post("/:id/agreement/sign", requireCustomer, async (req, res) => {
   try {
-    const { signedBy, signature } = req.body;
+    const { signedBy, signaturefont } = req.body;
 
     const application = await Application.findById(req.params.id);
 
@@ -591,10 +591,12 @@ router.post("/:id/agreement/sign", requireCustomer, async (req, res) => {
          data:image/png;base64,... format mein aayega.
       ================================================= */
 
-    if (!signature || !String(signature).startsWith("data:image/")) {
+    const allowedSignatureFonts = ["signature-1", "signature-2", "signature-3"];
+
+    if (!allowedSignatureFonts.includes(signatureFont)) {
       return res.status(400).json({
         success: false,
-        message: "Valid signature required hai.",
+        message: "Please valid signature style select karein.",
       });
     }
 
@@ -612,7 +614,7 @@ router.post("/:id/agreement/sign", requireCustomer, async (req, res) => {
 
     application.agreement.signedBy = String(signedBy).trim();
 
-    application.agreement.signature = String(signature);
+    application.agreement.signatureFont = signatureFont;
 
     application.agreement.signedAt = new Date();
 
