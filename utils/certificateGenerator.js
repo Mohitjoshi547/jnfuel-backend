@@ -295,7 +295,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * VALID UPTO
    */
 
-  doc.fontSize(17).text(validUpto, rightValueX + 36, row4Y + 64, {
+  doc.fontSize(22).text(validUpto, rightValueX + 36, row4Y + 64, {
     width: 330,
     height: 24,
     align: "left",
