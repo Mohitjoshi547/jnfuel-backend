@@ -540,7 +540,7 @@ router.get("/:id/agreement", requireCustomer, async (req, res) => {
 
 router.post("/:id/agreement/sign", requireCustomer, async (req, res) => {
   try {
-    const { signedBy, signaturefont } = req.body;
+    const { signedBy, signatureFont } = req.body;
 
     const application = await Application.findById(req.params.id);
 
