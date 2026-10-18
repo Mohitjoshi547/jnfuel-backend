@@ -192,7 +192,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * CUSTOMER NAME
    */
 
-  doc.fontSize(14).text(customerName, leftValueX, row1Y + 36, {
+  doc.fontSize(22).text(customerName, leftValueX, row1Y + 36, {
     width: 390,
     height: 24,
     align: "left",
@@ -204,7 +204,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * BUSINESS ADDRESS
    */
 
-  doc.fontSize(13).text(fullAddress, leftValueX, row2Y + 36, {
+  doc.fontSize(17).text(fullAddress, leftValueX, row2Y + 36, {
     width: 390,
     height: 24,
     align: "left",
@@ -219,7 +219,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * to yahan same full address use ho raha hai.
    */
 
-  doc.fontSize(13).text(fullAddress, leftValueX, row3Y + 36, {
+  doc.fontSize(17).text(fullAddress, leftValueX, row3Y + 36, {
     width: 390,
     height: 24,
     align: "left",
@@ -231,7 +231,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * CONTACT NUMBER
    */
 
-  doc.fontSize(14).text(mobile, leftValueX, row4Y + 36, {
+  doc.fontSize(18).text(mobile, leftValueX, row4Y + 36, {
     width: 390,
     height: 24,
     align: "left",
@@ -243,7 +243,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * EMAIL
    */
 
-  doc.fontSize(13).text(email, leftValueX, row5Y + 36, {
+  doc.fontSize(17).text(email, leftValueX, row5Y + 36, {
     width: 390,
     height: 24,
     align: "left",
@@ -259,7 +259,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * DP ID
    */
 
-  doc.fontSize(13).text(dpId, rightValueX + 36, row1Y + 36, {
+  doc.fontSize(17).text(dpId, rightValueX + 36, row1Y + 36, {
     width: 330,
     height: 24,
     align: "left",
@@ -271,7 +271,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * CERTIFICATE NUMBER
    */
 
-  doc.fontSize(13).text(certificateNumber, rightValueX + 36, row2Y + 42, {
+  doc.fontSize(17).text(certificateNumber, rightValueX + 36, row2Y + 42, {
     width: 330,
     height: 24,
     align: "left",
@@ -283,7 +283,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * ISSUE DATE
    */
 
-  doc.fontSize(13).text(issueDate, rightValueX + 36, row3Y + 60, {
+  doc.fontSize(17).text(issueDate, rightValueX + 36, row3Y + 60, {
     width: 330,
     height: 24,
     align: "left",
@@ -295,7 +295,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * VALID UPTO
    */
 
-  doc.fontSize(13).text(validUpto, rightValueX + 36, row4Y + 64, {
+  doc.fontSize(17).text(validUpto, rightValueX + 36, row4Y + 64, {
     width: 330,
     height: 24,
     align: "left",
