@@ -152,7 +152,7 @@ async function createCertificatePDF(application, frontendUrl) {
      GLOBAL FONT
   =================================================== */
 
-  doc.font("Helvetica");
+  doc.font("Helvetica-Bold");
 
   doc.fillColor("#071B45");
 
@@ -311,7 +311,7 @@ async function createCertificatePDF(application, frontendUrl) {
   /* CUSTOMER NAME */
 
   doc
-    .font("Helvetica")
+    .font("Helvetica-Bold")
     .fontSize(22)
     .fillColor("#071B45")
     .text(customerName, 270,710, {
@@ -325,7 +325,7 @@ async function createCertificatePDF(application, frontendUrl) {
   /* SELECTED BUSINESS PLAN */
 
   doc
-    .font("Helvetica")
+    .font("Helvetica-Bold")
     .fontSize(22)
     .fillColor("#071B45")
     .text(businessPlan, 100, 750, {
