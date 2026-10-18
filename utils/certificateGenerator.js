@@ -312,7 +312,7 @@ async function createCertificatePDF(application, frontendUrl) {
 
   doc
     .font("Helvetica")
-    .fontSize(18)
+    .fontSize(22)
     .fillColor("#071B45")
     .text(customerName, 270,710, {
       width: 850,
@@ -326,7 +326,7 @@ async function createCertificatePDF(application, frontendUrl) {
 
   doc
     .font("Helvetica")
-    .fontSize(18)
+    .fontSize(22)
     .fillColor("#071B45")
     .text(businessPlan, 100, 750, {
       width: 850,
