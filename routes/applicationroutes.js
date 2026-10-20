@@ -1,5 +1,6 @@
 const express = require("express");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 const QRCode = require("qrcode");
 
 const Application = require("../models/Application");
@@ -15,6 +16,16 @@ const {
 } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+const emailTransporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_APP_PASSWORD,
+  },
+});
+
+const EMAIL_FROM_NAME =
+  process.env.EMAIL_FROM_NAME || "JN Fuel Private Limited";
 
 /* =====================================================
    APPLICATION STATUSES
@@ -418,7 +429,7 @@ router.get("/", requireAdmin, async (req, res) => {
 
 /* =====================================================
    ADMIN
-   SEND AGREEMENT
+   SEND AGREEMENT EMAIL WITH SECURE SIGNING LINK
 ===================================================== */
 
 router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
@@ -439,37 +450,175 @@ router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
       });
     }
 
-    /*
-     * PDF generate karke check kar rahe hain
-     * ki template/data valid hai.
-     */
+    if (!application.email || !String(application.email).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer ki email address application mein nahi hai.",
+      });
+    }
 
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+      console.error("Email environment variables missing.");
+
+      return res.status(500).json({
+        success: false,
+        message: "Email configuration missing hai. Render environment variables check karein.",
+      });
+    }
+
+    /*
+     * Generate the agreement PDF first.
+     */
     await createAgreementPDF(application);
 
-    application.agreementStatus = "Sent";
+    /*
+     * Generate a cryptographically secure, one-time token.
+     * Database mein raw token store nahi hoga.
+     */
+    const signingToken = crypto.randomBytes(32).toString("hex");
+
+    const signingTokenHash = crypto
+      .createHash("sha256")
+      .update(signingToken)
+      .digest("hex");
+
+    /*
+     * Signing link 7 din ke liye valid hai.
+     */
+    const signingTokenExpiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    );
+
+    const frontendUrl = (
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    ).replace(/\/+$/, "");
+
+    const signingUrl =
+      `${frontendUrl}/sign-agreement/${signingToken}`;
+
+    /*
+     * Save token details before sending the email.
+     */
+    application.signingTokenHash = signingTokenHash;
+    application.signingTokenExpiresAt = signingTokenExpiresAt;
+    application.signingTokenUsedAt = null;
 
     if (!application.agreement) {
       application.agreement = {};
     }
 
     application.agreement.sentAt = new Date();
-
+    application.agreementStatus = "Sent";
     application.status = "Agreement Pending";
 
     await application.save();
 
+    /*
+     * Send email.
+     */
+    try {
+      await emailTransporter.sendMail({
+        from: {
+          name: EMAIL_FROM_NAME,
+          address: process.env.EMAIL_USER,
+        },
+
+        to: String(application.email).trim(),
+
+        subject: "JN Fuel Private Limited - Agreement for Your Application",
+
+        text: [
+          `Dear ${application.applicantName},`,
+          "",
+          "Your JN Fuel Private Limited agreement is ready for review and signing.",
+          "",
+          `Application Number: ${application.applicationNumber}`,
+          "",
+          "Please open the secure link below to read and sign your agreement:",
+          signingUrl,
+          "",
+          "This link expires in 7 days and can be used only once for signing.",
+          "",
+          "If you did not expect this email, please contact JN Fuel Private Limited.",
+          "",
+          "Regards,",
+          "JN Fuel Private Limited",
+        ].join("\n"),
+
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#243047;line-height:1.6">
+            <h2 style="color:#071b45">JN Fuel Private Limited</h2>
+
+            <p>Dear ${String(application.applicantName)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")},</p>
+
+            <p>Your agreement is ready for review and signing.</p>
+
+            <p>
+              <strong>Application Number:</strong>
+              ${String(application.applicationNumber || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")}
+            </p>
+
+            <p>Please read the agreement carefully before signing.</p>
+
+            <p style="margin:28px 0">
+              <a
+                href="${signingUrl}"
+                style="background:#071b45;color:#fff;padding:13px 22px;text-decoration:none;border-radius:6px;display:inline-block"
+              >
+                View and Sign Agreement
+              </a>
+            </p>
+
+            <p>This secure link expires in 7 days and is intended for one-time signing.</p>
+
+            <p>If you did not expect this email, please contact JN Fuel Private Limited.</p>
+
+            <p>Regards,<br><strong>JN Fuel Private Limited</strong></p>
+          </div>
+        `,
+      });
+    } catch (emailError) {
+      /*
+       * Email failed: don't leave the application marked as sent.
+       * Invalidate the token so the unsent link cannot be used.
+       */
+      console.error("Agreement email error:", emailError);
+
+      application.signingTokenHash = "";
+      application.signingTokenExpiresAt = null;
+      application.signingTokenUsedAt = null;
+      application.agreementStatus = "Generated";
+
+      if (application.agreement) {
+        application.agreement.sentAt = null;
+      }
+
+      await application.save();
+
+      return res.status(502).json({
+        success: false,
+        message: "Agreement email send nahi ho saka. Email settings check karke dobara try karein.",
+      });
+    }
+
     return res.json({
       success: true,
-      message: "Agreement successfully customer ko send ho gaya.",
-      application,
+      message: "Agreement customer ki email par successfully send ho gaya.",
       agreementAvailable: true,
+      application,
     });
   } catch (error) {
     console.error("Send agreement error:", error);
 
     return res.status(500).json({
       success: false,
-      message: error.message || "Agreement send nahi ho saka.",
+      message: "Agreement send nahi ho saka.",
     });
   }
 });
@@ -643,6 +792,223 @@ router.post("/:id/agreement/sign", requireCustomer, async (req, res) => {
     });
   } catch (error) {
     console.error("Sign agreement error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Agreement sign nahi ho saka.",
+    });
+  }
+});
+
+/* =====================================================
+   PUBLIC AGREEMENT LINK HELPERS
+===================================================== */
+
+function getApplicationFromSigningToken(token) {
+  if (!token || !/^[a-f0-9]{64}$/i.test(token)) {
+    return null;
+  }
+
+  const tokenHash = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  return {
+    signingTokenHash: tokenHash,
+    signingTokenExpiresAt: { $gt: new Date() },
+    signingTokenUsedAt: null,
+    agreementStatus: "Sent",
+  };
+}
+
+/* =====================================================
+   PUBLIC
+   GET AGREEMENT DETAILS USING SECURE TOKEN
+===================================================== */
+
+router.get("/agreement-link/:token", async (req, res) => {
+  try {
+    const filter = getApplicationFromSigningToken(req.params.token);
+
+    if (!filter) {
+      return res.status(400).json({
+        success: false,
+        message: "Agreement link invalid hai.",
+      });
+    }
+
+    const application = await Application.findOne(filter).select(
+      "applicantName applicationNumber businessName agreementStatus signingTokenHash signingTokenExpiresAt signingTokenUsedAt"
+    );
+
+    if (!application) {
+      return res.status(410).json({
+        success: false,
+        message: "Agreement link expire ho gaya hai ya pehle hi use ho chuka hai.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      application: {
+        applicantName: application.applicantName,
+        applicationNumber: application.applicationNumber,
+        businessName: application.businessName,
+      },
+    });
+  } catch (error) {
+    console.error("Public agreement details error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Agreement details load nahi ho sakin.",
+    });
+  }
+});
+
+/* =====================================================
+   PUBLIC
+   VIEW AGREEMENT PDF USING SECURE TOKEN
+===================================================== */
+
+router.get("/agreement-link/:token/pdf", async (req, res) => {
+  try {
+    const filter = getApplicationFromSigningToken(req.params.token);
+
+    if (!filter) {
+      return res.status(400).json({
+        success: false,
+        message: "Agreement link invalid hai.",
+      });
+    }
+
+    const application = await Application.findOne(filter);
+
+    if (!application) {
+      return res.status(410).json({
+        success: false,
+        message: "Agreement link expire ho gaya hai ya use ho chuka hai.",
+      });
+    }
+
+    const pdf = await createAgreementPDF(application);
+
+    if (!pdf || !Buffer.isBuffer(pdf)) {
+      throw new Error("Agreement PDF generate nahi hui.");
+    }
+
+    const safeNumber = String(application.applicationNumber || "Agreement")
+      .replace(/[^a-zA-Z0-9_-]/g, "_");
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="Agreement-${safeNumber}.pdf"`
+    );
+    res.setHeader("Cache-Control", "no-store");
+
+    return res.send(pdf);
+  } catch (error) {
+    console.error("Public agreement PDF error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Agreement PDF load nahi ho saki.",
+    });
+  }
+});
+
+/* =====================================================
+   PUBLIC
+   SIGN AGREEMENT USING SECURE TOKEN
+===================================================== */
+
+router.post("/agreement-link/:token/sign", async (req, res) => {
+  try {
+    const token = req.params.token;
+    const { signedBy, signatureFont } = req.body;
+
+    if (!token || !/^[a-f0-9]{64}$/i.test(token)) {
+      return res.status(400).json({
+        success: false,
+        message: "Agreement link invalid hai.",
+      });
+    }
+
+    if (!signedBy || !String(signedBy).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Apna poora naam enter karein.",
+      });
+    }
+
+    if (String(signedBy).trim().length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Naam 100 characters se chhota hona chahiye.",
+      });
+    }
+
+    const allowedSignatureFonts = [
+      "signature-1",
+      "signature-2",
+      "signature-3",
+    ];
+
+    if (!allowedSignatureFonts.includes(signatureFont)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid signature style select karein.",
+      });
+    }
+
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    /*
+     * Atomic update:
+     * Only one request can consume this unused,
+     * unexpired token while the agreement is Sent.
+     */
+    const application = await Application.findOneAndUpdate(
+      {
+        signingTokenHash: tokenHash,
+        signingTokenExpiresAt: { $gt: new Date() },
+        signingTokenUsedAt: null,
+        agreementStatus: "Sent",
+      },
+      {
+        $set: {
+          signingTokenUsedAt: new Date(),
+          agreementStatus: "Signed",
+          status: "Agreement Pending",
+          "agreement.signedBy": String(signedBy).trim(),
+          "agreement.signatureFont": signatureFont,
+          "agreement.signedAt": new Date(),
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!application) {
+      return res.status(410).json({
+        success: false,
+        message: "Agreement link expire ho gaya hai ya pehle hi use ho chuka hai.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Agreement successfully sign ho gaya.",
+    });
+  } catch (error) {
+    console.error("Public agreement signing error:", error);
 
     return res.status(500).json({
       success: false,

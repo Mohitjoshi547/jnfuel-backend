@@ -241,6 +241,23 @@ const applicationSchema = new mongoose.Schema(
         trim: true,
       },
     },
+    /* Secure email signing link */
+
+signingTokenHash: {
+  type: String,
+  default: "",
+  select: false,
+},
+
+signingTokenExpiresAt: {
+  type: Date,
+  default: null,
+},
+
+signingTokenUsedAt: {
+  type: Date,
+  default: null,
+},
 
     /* =========================================
        CERTIFICATE
