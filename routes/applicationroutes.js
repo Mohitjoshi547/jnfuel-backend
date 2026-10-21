@@ -1,6 +1,5 @@
 const express = require("express");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const QRCode = require("qrcode");
 
 const Application = require("../models/Application");
@@ -431,10 +430,10 @@ router.get("/", requireAdmin, async (req, res) => {
     });
   }
 });
-
 /* =====================================================
    ADMIN
-   SEND AGREEMENT EMAIL WITH SECURE SIGNING LINK
+   GENERATE AGREEMENT WITH SECURE SIGNING LINK
+   EMAIL SENDING REMOVED
 ===================================================== */
 
 router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
@@ -455,31 +454,10 @@ router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
       });
     }
 
-    if (!application.email || !String(application.email).trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Customer ki email address application mein nahi hai.",
-      });
-    }
-
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
-      console.error("Email environment variables missing.");
-
-      return res.status(500).json({
-        success: false,
-        message: "Email configuration missing hai. Render environment variables check karein.",
-      });
-    }
-
-    /*
-     * Generate the agreement PDF first.
-     */
+    // Agreement PDF generate karo.
     await createAgreementPDF(application);
 
-    /*
-     * Generate a cryptographically secure, one-time token.
-     * Database mein raw token store nahi hoga.
-     */
+    // Secure signing token generate karo.
     const signingToken = crypto.randomBytes(32).toString("hex");
 
     const signingTokenHash = crypto
@@ -487,9 +465,7 @@ router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
       .update(signingToken)
       .digest("hex");
 
-    /*
-     * Signing link 7 din ke liye valid hai.
-     */
+    // Signing link 7 din tak valid rahega.
     const signingTokenExpiresAt = new Date(
       Date.now() + 7 * 24 * 60 * 60 * 1000
     );
@@ -498,12 +474,9 @@ router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
       process.env.FRONTEND_URL || "http://localhost:5173"
     ).replace(/\/+$/, "");
 
-    const signingUrl =
-      `${frontendUrl}/sign-agreement/${signingToken}`;
+    const signingUrl = `${frontendUrl}/sign-agreement/${signingToken}`;
 
-    /*
-     * Save token details before sending the email.
-     */
+    // Token database mein save karo.
     application.signingTokenHash = signingTokenHash;
     application.signingTokenExpiresAt = signingTokenExpiresAt;
     application.signingTokenUsedAt = null;
@@ -518,112 +491,19 @@ router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
 
     await application.save();
 
-    /*
-     * Send email.
-     */
-    try {
-      await emailTransporter.sendMail({
-        from: {
-          name: EMAIL_FROM_NAME,
-          address: process.env.EMAIL_USER,
-        },
-
-        to: String(application.email).trim(),
-
-        subject: "JN Fuel Private Limited - Agreement for Your Application",
-
-        text: [
-          `Dear ${application.applicantName},`,
-          "",
-          "Your JN Fuel Private Limited agreement is ready for review and signing.",
-          "",
-          `Application Number: ${application.applicationNumber}`,
-          "",
-          "Please open the secure link below to read and sign your agreement:",
-          signingUrl,
-          "",
-          "This link expires in 7 days and can be used only once for signing.",
-          "",
-          "If you did not expect this email, please contact JN Fuel Private Limited.",
-          "",
-          "Regards,",
-          "JN Fuel Private Limited",
-        ].join("\n"),
-
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#243047;line-height:1.6">
-            <h2 style="color:#071b45">JN Fuel Private Limited</h2>
-
-            <p>Dear ${String(application.applicantName)
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")},</p>
-
-            <p>Your agreement is ready for review and signing.</p>
-
-            <p>
-              <strong>Application Number:</strong>
-              ${String(application.applicationNumber || "")
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")}
-            </p>
-
-            <p>Please read the agreement carefully before signing.</p>
-
-            <p style="margin:28px 0">
-              <a
-                href="${signingUrl}"
-                style="background:#071b45;color:#fff;padding:13px 22px;text-decoration:none;border-radius:6px;display:inline-block"
-              >
-                View and Sign Agreement
-              </a>
-            </p>
-
-            <p>This secure link expires in 7 days and is intended for one-time signing.</p>
-
-            <p>If you did not expect this email, please contact JN Fuel Private Limited.</p>
-
-            <p>Regards,<br><strong>JN Fuel Private Limited</strong></p>
-          </div>
-        `,
-      });
-    } catch (emailError) {
-      /*
-       * Email failed: don't leave the application marked as sent.
-       * Invalidate the token so the unsent link cannot be used.
-       */
-      console.error("Agreement email error:", emailError);
-
-      application.signingTokenHash = "";
-      application.signingTokenExpiresAt = null;
-      application.signingTokenUsedAt = null;
-      application.agreementStatus = "Generated";
-
-      if (application.agreement) {
-        application.agreement.sentAt = null;
-      }
-
-      await application.save();
-
-      return res.status(502).json({
-        success: false,
-        message: "Agreement email send nahi ho saka. Email settings check karke dobara try karein.",
-      });
-    }
-
     return res.json({
       success: true,
-      message: "Agreement customer ki email par successfully send ho gaya.",
+      message: "Agreement successfully generate ho gaya.",
       agreementAvailable: true,
+      signingUrl,
       application,
     });
   } catch (error) {
-    console.error("Send agreement error:", error);
+    console.error("Generate agreement error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Agreement send nahi ho saka.",
+      message: "Agreement generate nahi ho saka.",
     });
   }
 });
