@@ -38,7 +38,7 @@ const applicationSchema = new mongoose.Schema(
     aadhaarNumber: {
       type: String,
       default: "",
-      select: false,
+      select: true,
     },
     email: {
       type: String,
