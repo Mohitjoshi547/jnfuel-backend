@@ -483,8 +483,9 @@ router.get("/", requireAdmin, async (req, res) => {
 
 router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
   try {
-    const application = await Application.findById(req.params.id);
-    select("+aadhaarNumber");
+    const application = await Application.findById(req.params.id).select(
+      "+aadhaarNumber",
+    );
 
     if (!application) {
       return res.status(404).json({
@@ -561,8 +562,9 @@ router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
 
 router.get("/:id/agreement", requireCustomer, async (req, res) => {
   try {
-    const application = await Application.findById(req.params.id);
-
+    const application = await Application.findById(req.params.id).select(
+      "+aadhaarNumber",
+    );
     if (!application) {
       return res.status(404).json({
         success: false,
@@ -589,6 +591,9 @@ router.get("/:id/agreement", requireCustomer, async (req, res) => {
     }
 
     const pdf = await createAgreementPDF(application);
+    if (!pdf || !Buffer.isBuffer(pdf) || pdf.length === 0) {
+  throw new Error("Agreement PDF empty hai ya generate nahi hui.");
+}
 
     const safeApplicationNumber = String(application.applicationNumber).replace(
       /[^a-zA-Z0-9-_]/g,
@@ -803,7 +808,8 @@ router.get("/agreement-link/:token", async (req, res) => {
 
 router.get("/agreement-link/:token/pdf", async (req, res) => {
   try {
-    const filter = getApplicationFromSigningToken(req.params.token);
+    const filter = getApplicationFromSigningToken(req.params.token)
+    .select("+aadhaarNumber");
 
     if (!filter) {
       return res.status(400).json({
