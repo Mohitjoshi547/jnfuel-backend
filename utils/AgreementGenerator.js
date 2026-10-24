@@ -1,4 +1,3 @@
-
 const fs = require("fs");
 const path = require("path");
 
@@ -7,19 +6,31 @@ const fontkit = require("@pdf-lib/fontkit");
 
 async function createAgreementPDF(application) {
   try {
+    if (!application) {
+      throw new Error("Application data nahi mili.");
+    }
+
+    // Original agreement PDF
     const agreementPath = path.join(
       __dirname,
       "../agreements/JN Fuel Agreement.pdf"
     );
 
     if (!fs.existsSync(agreementPath)) {
-      throw new Error("JN Fuel Agreement.pdf file nahi mili.");
+      throw new Error(
+        `Agreement PDF file nahi mili: ${agreementPath}`
+      );
     }
 
     const existingPdfBytes = fs.readFileSync(agreementPath);
+
+    if (!existingPdfBytes || existingPdfBytes.length === 0) {
+      throw new Error("Original agreement PDF empty hai.");
+    }
+
+    // Load original PDF
     const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
-    // Custom TTF fonts support
     pdfDoc.registerFontkit(fontkit);
 
     const pages = pdfDoc.getPages();
@@ -30,10 +41,15 @@ async function createAgreementPDF(application) {
 
     const firstPage = pages[0];
 
-    const normalFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const normalFont = await pdfDoc.embedFont(
+      StandardFonts.Helvetica
+    );
 
-    // Signature font files
+    const boldFont = await pdfDoc.embedFont(
+      StandardFonts.HelveticaBold
+    );
+
+    // Signature fonts
     const fontsDirectory = path.join(__dirname, "../fonts");
 
     const signatureFonts = {
@@ -42,39 +58,63 @@ async function createAgreementPDF(application) {
       "signature-3": "signature-3.ttf",
     };
 
-    const applicantSignatureFont =
+    const selectedSignature =
       application?.agreement?.signatureFont || "signature-1";
 
     const selectedFontFile =
-      signatureFonts[applicantSignatureFont] || signatureFonts["signature-1"];
+      signatureFonts[selectedSignature] ||
+      signatureFonts["signature-1"];
 
-    const selectedFontPath = path.join(fontsDirectory, selectedFontFile);
+    const selectedFontPath = path.join(
+      fontsDirectory,
+      selectedFontFile
+    );
 
     if (!fs.existsSync(selectedFontPath)) {
-      throw new Error(`Signature font file nahi mili: ${selectedFontPath}`);
+      throw new Error(
+        `Signature font file nahi mili: ${selectedFontPath}`
+      );
     }
 
     const signatureFontBytes = fs.readFileSync(selectedFontPath);
-    const signatureFont = await pdfDoc.embedFont(signatureFontBytes);
 
-    const applicantName = String(application?.applicantName || "").trim();
-    const fatherName = String(application?.fatherName || "").trim();
+    const signatureFont = await pdfDoc.embedFont(
+      signatureFontBytes
+    );
 
-    const aadhaarNumber = String(
-      application?.aadhaarNumber || application?.aadhaar || ""
+    // Application details
+    const applicantName = String(
+      application.applicantName || ""
     ).trim();
 
-    const mobile = String(application?.mobile || "").trim();
+    const fatherName = String(
+      application.fatherName || ""
+    ).trim();
+
+    const rawAadhaar = String(
+      application.aadhaarNumber || application.aadhaar || ""
+    ).replace(/\D/g, "");
+
+    // Aadhaar ko masked format mein print karein.
+    // Example: XXXX-XXXX-1234
+    const aadhaarNumber =
+      rawAadhaar.length === 12
+        ? `XXXX-XXXX-${rawAadhaar.slice(-4)}`
+        : "";
+
+    const mobile = String(
+      application.mobile || ""
+    ).trim();
 
     const applicationNumber = String(
-      application?.applicationNumber || ""
+      application.applicationNumber || ""
     ).trim();
 
     const signedBy = String(
-      application?.agreement?.signedBy || ""
+      application.agreement?.signedBy || ""
     ).trim();
 
-    const address = application?.address || {};
+    const address = application.address || {};
 
     const addressParts = [
       address.line,
@@ -86,11 +126,14 @@ async function createAgreementPDF(application) {
 
     const fullAddress = addressParts.join(", ");
 
+    // Date
     const today = new Date();
+
     const day = String(today.getDate()).padStart(2, "0");
     const month = String(today.getMonth() + 1).padStart(2, "0");
     const year = today.getFullYear();
 
+    // Safe text drawing
     const drawText = ({
       text,
       x,
@@ -119,7 +162,11 @@ async function createAgreementPDF(application) {
 
     const textWidth = (text, size = 8, bold = false) => {
       const selectedFont = bold ? boldFont : normalFont;
-      return selectedFont.widthOfTextAtSize(String(text), size);
+
+      return selectedFont.widthOfTextAtSize(
+        String(text),
+        size
+      );
     };
 
     const drawFitText = ({
@@ -162,6 +209,7 @@ async function createAgreementPDF(application) {
 
       const words = String(text).split(/\s+/);
       const lines = [];
+
       let currentLine = "";
 
       for (const word of words) {
@@ -172,20 +220,42 @@ async function createAgreementPDF(application) {
         if (textWidth(testLine, size) <= maxWidth) {
           currentLine = testLine;
         } else {
-          if (currentLine) lines.push(currentLine);
+          if (currentLine) {
+            lines.push(currentLine);
+          }
+
           currentLine = word;
         }
       }
 
-      if (currentLine) lines.push(currentLine);
+      if (currentLine) {
+        lines.push(currentLine);
+      }
 
       return lines;
     };
 
     // Date fields
-    drawText({ text: day, x: 430, y: 765, size: 8 });
-    drawText({ text: "/", x: 438, y: 765, size: 8 });
-    drawText({ text: month, x: 440, y: 765, size: 8 });
+    drawText({
+      text: day,
+      x: 430,
+      y: 765,
+      size: 8,
+    });
+
+    drawText({
+      text: "/",
+      x: 438,
+      y: 765,
+      size: 8,
+    });
+
+    drawText({
+      text: month,
+      x: 440,
+      y: 765,
+      size: 8,
+    });
 
     drawText({
       text: `${day}/${month}/${year}`,
@@ -226,7 +296,13 @@ async function createAgreementPDF(application) {
     // Address
     if (fullAddress) {
       const addressFontSize = 7;
-      const addressLines = wrapText(fullAddress, 525, addressFontSize);
+
+      const addressLines = wrapText(
+        fullAddress,
+        525,
+        addressFontSize
+      );
+
       let addressY = 535;
 
       for (const line of addressLines) {
@@ -253,7 +329,7 @@ async function createAgreementPDF(application) {
       });
     }
 
-    // Mobile number
+    // Mobile
     if (mobile) {
       drawText({
         text: `Mobile: ${mobile}`,
@@ -263,13 +339,15 @@ async function createAgreementPDF(application) {
       });
     }
 
-    // Customer's typed signature in the selected font
+    // Customer typed signature
     if (signedBy) {
       const signatureSize = 24;
-      const signatureWidth = signatureFont.widthOfTextAtSize(
-        signedBy,
-        signatureSize
-      );
+
+      const signatureWidth =
+        signatureFont.widthOfTextAtSize(
+          signedBy,
+          signatureSize
+        );
 
       const signatureMarginRight = 35;
       const signatureMarginBottom = 35;
@@ -279,19 +357,24 @@ async function createAgreementPDF(application) {
         const pageHeight = page.getHeight();
 
         const maxWidth = Math.min(220, pageWidth - 70);
+
         const finalSize =
           signatureWidth > maxWidth
             ? signatureSize * (maxWidth / signatureWidth)
             : signatureSize;
 
-        const finalWidth = signatureFont.widthOfTextAtSize(
-          signedBy,
-          finalSize
-        );
+        const finalWidth =
+          signatureFont.widthOfTextAtSize(
+            signedBy,
+            finalSize
+          );
 
         page.drawText(signedBy, {
           x: pageWidth - finalWidth - signatureMarginRight,
-          y: Math.min(signatureMarginBottom, pageHeight - 60),
+          y: Math.min(
+            signatureMarginBottom,
+            pageHeight - 60
+          ),
           size: finalSize,
           font: signatureFont,
           color: rgb(0, 0, 0),
@@ -299,11 +382,33 @@ async function createAgreementPDF(application) {
       }
     }
 
+    // Generate final PDF
     const finalPdfBytes = await pdfDoc.save();
 
-    return Buffer.from(finalPdfBytes);
+    if (!finalPdfBytes || finalPdfBytes.length === 0) {
+      throw new Error("Final agreement PDF empty hai.");
+    }
+
+    const finalPdfBuffer = Buffer.from(finalPdfBytes);
+
+    console.log(
+      "Agreement PDF generated successfully:",
+      application.applicationNumber,
+      "Pages:",
+      pages.length,
+      "Size:",
+      finalPdfBuffer.length,
+      "bytes"
+    );
+
+    return finalPdfBuffer;
   } catch (error) {
-    console.error("Agreement PDF generation error:", error);
+    console.error(
+      "Agreement PDF generation error:",
+      error.message,
+      error.stack
+    );
+
     throw error;
   }
 }
