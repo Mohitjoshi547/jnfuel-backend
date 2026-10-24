@@ -109,12 +109,18 @@ async function issueCertificate(application) {
    CREATE APPLICATION
 ===================================================== */
 
+/* =====================================================
+   CUSTOMER
+   CREATE APPLICATION — WITH AADHAAR VALIDATION
+===================================================== */
+
 router.post("/", requireCustomer, async (req, res) => {
   let createdApplication = null;
 
   try {
     const customer = req.customer;
 
+    // Check whether the customer already has an application.
     if (customer.applicationNumber) {
       return res.status(409).json({
         success: false,
@@ -138,6 +144,7 @@ router.post("/", requireCustomer, async (req, res) => {
       remarks,
     } = req.body;
 
+    // Validate required application fields.
     if (
       !applicantName ||
       !fatherName ||
@@ -156,8 +163,31 @@ router.post("/", requireCustomer, async (req, res) => {
       });
     }
 
+    // Normalize Aadhaar to digits only.
+    const cleanAadhaar = String(aadhaarNumber || "").replace(/\D/g, "");
+
+    // Aadhaar must contain exactly 12 digits.
+    if (!/^\d{12}$/.test(cleanAadhaar)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please valid 12-digit Aadhaar number enter karein.",
+      });
+    }
+
+    // Validate business model.
+    const allowedBusinessModels = ["FDP", "Mini Pump", "Bowser"];
+
+    if (!allowedBusinessModels.includes(businessModel)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please valid business plan select karein.",
+      });
+    }
+
+    // Generate application number.
     const applicationNumber = generateApplicationNumber();
 
+    // Create application in MongoDB.
     createdApplication = await Application.create({
       applicationNumber,
 
@@ -165,38 +195,44 @@ router.post("/", requireCustomer, async (req, res) => {
 
       fatherName: String(fatherName).trim(),
 
-      dateOfBirth,
+      dateOfBirth: String(dateOfBirth),
 
-      gender,
+      gender: String(gender).trim(),
 
       mobile: String(mobile).trim(),
-      aadhaarNumber: String(aadhaarNumber || "").trim(),
 
-      email: email ? String(email).trim() : "",
+      aadhaarNumber: cleanAadhaar,
 
-      businessName: businessName || "",
+      email: email ? String(email).trim().toLowerCase() : "",
+
+      businessName: businessName ? String(businessName).trim() : "",
 
       businessModel,
 
-      preferredLocation: preferredLocation || "",
+      preferredLocation: preferredLocation
+        ? String(preferredLocation).trim()
+        : "",
 
       address: {
-        line: address.line || "",
+        line: String(address.line).trim(),
 
-        villageTownCity: address.villageTownCity || "",
+        villageTownCity: address.villageTownCity
+          ? String(address.villageTownCity).trim()
+          : "",
 
-        district: address.district,
+        district: String(address.district).trim(),
 
-        state: address.state,
+        state: String(address.state).trim(),
 
-        pinCode: address.pinCode,
+        pinCode: String(address.pinCode).trim(),
       },
 
-      remarks: remarks || "",
+      remarks: remarks ? String(remarks).trim() : "",
 
       status: "Submitted",
     });
 
+    // Link the application to the logged-in customer.
     const linkedCustomer = await Customer.findOneAndUpdate(
       {
         _id: customer._id,
@@ -216,6 +252,7 @@ router.post("/", requireCustomer, async (req, res) => {
       },
     );
 
+    // If linking fails, remove the newly created application.
     if (!linkedCustomer) {
       await Application.deleteOne({
         _id: createdApplication._id,
@@ -229,14 +266,20 @@ router.post("/", requireCustomer, async (req, res) => {
       });
     }
 
+    // Return the application without exposing raw Aadhaar.
+    const applicationResponse = createdApplication.toObject();
+
+    delete applicationResponse.aadhaarNumber;
+
     return res.status(201).json({
       success: true,
       message: "Application successfully submit ho gayi.",
-      application: createdApplication,
+      application: applicationResponse,
     });
   } catch (error) {
     console.error("Create application error:", error);
 
+    // Clean up an unlinked application if submission fails.
     if (createdApplication) {
       try {
         const linked = await Customer.exists({
@@ -260,24 +303,32 @@ router.post("/", requireCustomer, async (req, res) => {
     });
   }
 });
-
 /* =====================================================
    CUSTOMER
    GET OWN APPLICATION
 ===================================================== */
 
+/* =====================================================
+   CUSTOMER
+   GET OWN APPLICATION — AADHAAR INCLUDED
+===================================================== */
+
 router.get("/number/:applicationNumber", requireCustomer, async (req, res) => {
   try {
-    if (req.customer.applicationNumber !== req.params.applicationNumber) {
+    // Verify that the logged-in customer owns this application.
+    if (
+      req.customer.applicationNumber !== req.params.applicationNumber
+    ) {
       return res.status(403).json({
         success: false,
         message: "Aapko is application ka access nahi hai.",
       });
     }
 
+    // Explicitly include Aadhaar because the schema uses select: false.
     const application = await Application.findOne({
       applicationNumber: req.params.applicationNumber,
-    });
+    }).select("+aadhaarNumber");
 
     if (!application) {
       return res.status(404).json({
@@ -286,9 +337,19 @@ router.get("/number/:applicationNumber", requireCustomer, async (req, res) => {
       });
     }
 
+    // Mask Aadhaar before returning it to the frontend.
+    const applicationResponse = application.toObject();
+
+    const aadhaar = String(applicationResponse.aadhaarNumber || "");
+
+    applicationResponse.aadhaarNumber =
+      /^\d{12}$/.test(aadhaar)
+        ? `XXXX-XXXX-${aadhaar.slice(-4)}`
+        : "";
+
     return res.json({
       success: true,
-      application,
+      application: applicationResponse,
     });
   } catch (error) {
     console.error("Get customer application error:", error);
