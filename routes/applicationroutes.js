@@ -248,6 +248,7 @@ router.post("/", requireCustomer, async (req, res) => {
         },
       },
       {
+        returnDocument: "after",
         new: true,
       },
     );
@@ -316,9 +317,7 @@ router.post("/", requireCustomer, async (req, res) => {
 router.get("/number/:applicationNumber", requireCustomer, async (req, res) => {
   try {
     // Verify that the logged-in customer owns this application.
-    if (
-      req.customer.applicationNumber !== req.params.applicationNumber
-    ) {
+    if (req.customer.applicationNumber !== req.params.applicationNumber) {
       return res.status(403).json({
         success: false,
         message: "Aapko is application ka access nahi hai.",
@@ -342,10 +341,9 @@ router.get("/number/:applicationNumber", requireCustomer, async (req, res) => {
 
     const aadhaar = String(applicationResponse.aadhaarNumber || "");
 
-    applicationResponse.aadhaarNumber =
-      /^\d{12}$/.test(aadhaar)
-        ? `XXXX-XXXX-${aadhaar.slice(-4)}`
-        : "";
+    applicationResponse.aadhaarNumber = /^\d{12}$/.test(aadhaar)
+      ? `XXXX-XXXX-${aadhaar.slice(-4)}`
+      : "";
 
     return res.json({
       success: true,
@@ -915,7 +913,7 @@ router.post("/agreement-link/:token/sign", async (req, res) => {
         },
       },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       },
     );
