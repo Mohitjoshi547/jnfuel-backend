@@ -19,7 +19,6 @@ const router = express.Router();
 /* =====================================================
    APPLICATION STATUSES
 ===================================================== */
-
 const APPLICATION_STATUSES = [
   "Draft",
   "Submitted",
@@ -130,6 +129,7 @@ router.post("/", requireCustomer, async (req, res) => {
       dateOfBirth,
       gender,
       mobile,
+      aadhaarNumber,
       email,
       businessName,
       businessModel,
@@ -170,6 +170,7 @@ router.post("/", requireCustomer, async (req, res) => {
       gender,
 
       mobile: String(mobile).trim(),
+      aadhaarNumber: String(aadhaarNumber || "").trim(),
 
       email: email ? String(email).trim() : "",
 
@@ -452,7 +453,7 @@ router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
 
     // Signing link 7 din tak valid rahega.
     const signingTokenExpiresAt = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
     );
 
     const frontendUrl = (
@@ -679,10 +680,7 @@ function getApplicationFromSigningToken(token) {
     return null;
   }
 
-  const tokenHash = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
   return {
     signingTokenHash: tokenHash,
@@ -709,13 +707,14 @@ router.get("/agreement-link/:token", async (req, res) => {
     }
 
     const application = await Application.findOne(filter).select(
-      "applicantName applicationNumber businessName agreementStatus signingTokenHash signingTokenExpiresAt signingTokenUsedAt"
+      "applicantName applicationNumber businessName agreementStatus signingTokenHash signingTokenExpiresAt signingTokenUsedAt",
     );
 
     if (!application) {
       return res.status(410).json({
         success: false,
-        message: "Agreement link expire ho gaya hai ya pehle hi use ho chuka hai.",
+        message:
+          "Agreement link expire ho gaya hai ya pehle hi use ho chuka hai.",
       });
     }
 
@@ -768,13 +767,14 @@ router.get("/agreement-link/:token/pdf", async (req, res) => {
       throw new Error("Agreement PDF generate nahi hui.");
     }
 
-    const safeNumber = String(application.applicationNumber || "Agreement")
-      .replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeNumber = String(
+      application.applicationNumber || "Agreement",
+    ).replace(/[^a-zA-Z0-9_-]/g, "_");
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `inline; filename="Agreement-${safeNumber}.pdf"`
+      `inline; filename="Agreement-${safeNumber}.pdf"`,
     );
     res.setHeader("Cache-Control", "no-store");
 
@@ -820,11 +820,7 @@ router.post("/agreement-link/:token/sign", async (req, res) => {
       });
     }
 
-    const allowedSignatureFonts = [
-      "signature-1",
-      "signature-2",
-      "signature-3",
-    ];
+    const allowedSignatureFonts = ["signature-1", "signature-2", "signature-3"];
 
     if (!allowedSignatureFonts.includes(signatureFont)) {
       return res.status(400).json({
@@ -833,10 +829,7 @@ router.post("/agreement-link/:token/sign", async (req, res) => {
       });
     }
 
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(token)
-      .digest("hex");
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
     /*
      * Atomic update:
@@ -863,13 +856,14 @@ router.post("/agreement-link/:token/sign", async (req, res) => {
       {
         new: true,
         runValidators: true,
-      }
+      },
     );
 
     if (!application) {
       return res.status(410).json({
         success: false,
-        message: "Agreement link expire ho gaya hai ya pehle hi use ho chuka hai.",
+        message:
+          "Agreement link expire ho gaya hai ya pehle hi use ho chuka hai.",
       });
     }
 

@@ -35,7 +35,11 @@ const applicationSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
+    aadhaarNumber: {
+      type: String,
+      default: "",
+      select: false,
+    },
     email: {
       type: String,
       default: "",
@@ -243,21 +247,21 @@ const applicationSchema = new mongoose.Schema(
     },
     /* Secure email signing link */
 
-signingTokenHash: {
-  type: String,
-  default: "",
-  select: false,
-},
+    signingTokenHash: {
+      type: String,
+      default: "",
+      select: false,
+    },
 
-signingTokenExpiresAt: {
-  type: Date,
-  default: null,
-},
+    signingTokenExpiresAt: {
+      type: Date,
+      default: null,
+    },
 
-signingTokenUsedAt: {
-  type: Date,
-  default: null,
-},
+    signingTokenUsedAt: {
+      type: Date,
+      default: null,
+    },
 
     /* =========================================
        CERTIFICATE
