@@ -5,7 +5,7 @@ const QRCode = require("qrcode");
 
 const TEMPLATE_PATH = path.join(
   __dirname,
-  "../assets/certificate-template.jpeg",
+  "../assets/certificate-template.png",
 );
 
 /* =====================================================
