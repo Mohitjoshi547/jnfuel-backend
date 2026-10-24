@@ -484,6 +484,7 @@ router.get("/", requireAdmin, async (req, res) => {
 router.post("/:id/agreement/send", requireAdmin, async (req, res) => {
   try {
     const application = await Application.findById(req.params.id);
+    select("+aadhaarNumber");
 
     if (!application) {
       return res.status(404).json({
@@ -913,7 +914,6 @@ router.post("/agreement-link/:token/sign", async (req, res) => {
         },
       },
       {
-        returnDocument: "after",
         runValidators: true,
       },
     );
