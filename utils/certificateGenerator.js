@@ -99,7 +99,7 @@ async function createCertificatePDF(application, frontendUrl) {
     width: 300,
     margin: 1,
     errorCorrectionLevel: "H",
-
+    
   });
 
   /* ===================================================
@@ -347,13 +347,13 @@ async function createCertificatePDF(application, frontendUrl) {
    * Pehle existing QR area ko white cover.
    */
 
-  doc.save().rect(1380, 770, 105, 105).fill("#FFFFFF").restore();
+  doc.save().rect(1350, 795, 105, 105).fill("#FFFFFF").restore();
 
   /*
    * Dynamic QR
    */
 
-  doc.image(qrBuffer, 1350, 795, {
+  doc.image(qrBuffer, 1375, 777, {
     width: 105,
     height: 105,
   });

@@ -277,7 +277,7 @@ async function createAgreementPDF(application) {
 
     drawFitText({
       text: aadhaarNumber,
-      x: 450,
+      x: 440,
       y: 557,
       maxWidth: 105,
       size: 8,
