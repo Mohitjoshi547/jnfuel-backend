@@ -50,6 +50,9 @@ function getFullAddress(application) {
     .filter(Boolean)
     .join(", ");
 }
+function getBusinessAddress(application) {
+  return cleanText(application?.preferredLocation);
+}
 
 /*
  * IMPORTANT:
@@ -99,7 +102,6 @@ async function createCertificatePDF(application, frontendUrl) {
     width: 300,
     margin: 1,
     errorCorrectionLevel: "H",
-    
   });
 
   /* ===================================================
@@ -136,6 +138,7 @@ async function createCertificatePDF(application, frontendUrl) {
   const businessPlan = getPlanName(application);
 
   const fullAddress = getFullAddress(application);
+  const businessAddress = getBusinessAddress(application);
 
   const mobile = cleanText(application.mobile);
 
@@ -205,7 +208,7 @@ async function createCertificatePDF(application, frontendUrl) {
    * BUSINESS ADDRESS
    */
 
-  doc.fontSize(22).text(fullAddress, leftValueX, row2Y + 36, {
+  doc.fontSize(22).text(businessAddress, leftValueX, row2Y + 36, {
     width: 390,
     height: 24,
     align: "left",
@@ -315,7 +318,7 @@ async function createCertificatePDF(application, frontendUrl) {
     .font("Helvetica-Bold")
     .fontSize(22)
     .fillColor("#071B45")
-    .text(customerName, 270,710, {
+    .text(customerName, 270, 710, {
       width: 850,
       height: 30,
       align: "center",
